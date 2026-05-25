@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure File Encryption &amp; Steganography Suite</title>
+  <script>
+    (function () {
+      var t = localStorage.getItem("theme") || "dark";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Secure File Suite</h1>
+      <p>AES-256 encryption · Steganography · Hashing · Integrity checks</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+        <span class="icon" id="theme-icon">🌙</span>
+        <span id="theme-label">Dark</span>
+      </button>
+      {% if user %}
+      <div class="user-bar">
+        <span>Signed in as <strong>{{ user }}</strong></span>
+        <a class="btn btn-ghost" href="{{ url_for('logout') }}">Log out</a>
+      </div>
+      {% endif %}
+    </div>
+  </header>
+
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flash-wrap">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
+    {% if request.args.get('dl') and request.args.get('file') %}
+    <div class="download-banner">
+      Download ready:
+      <a href="{{ url_for('download', folder=request.args.get('dl'), filename=request.args.get('file')) }}">
+        {{ request.args.get('file') }}
+      </a>
+    </div>
+    {% endif %}
+
+    {% if not user %}
+    <div class="auth-single card">
+      <div id="auth-login" class="auth-pane{% if request.args.get('auth') != 'register' %} active{% endif %}">
+        <h2>Welcome back</h2>
+        <p class="auth-subtitle">Sign in to access the security tools</p>
+        <form method="post" action="{{ url_for('login') }}">
+          <label for="login-user">Username</label>
+          <input type="text" id="login-user" name="username" required minlength="3" autocomplete="username">
+          <label for="login-pass">Password</label>
+          <input type="password" id="login-pass" name="password" required minlength="6" autocomplete="current-password">
+          <button type="submit" class="btn btn-primary" style="width:100%">Log in</button>
+        </form>
+        <p class="auth-switch">
+          Don't have an account?
+          <button type="button" class="btn-link" data-auth-show="register">Sign up</button>
+        </p>
+      </div>
+
+      <div id="auth-register" class="auth-pane{% if request.args.get('auth') == 'register' %} active{% endif %}">
+        <h2>Create account</h2>
+        <p class="auth-subtitle">Register to start using the suite</p>
+        <form method="post" action="{{ url_for('register') }}">
+          <label for="reg-user">Username</label>
+          <input type="text" id="reg-user" name="username" required minlength="3" autocomplete="username">
+          <label for="reg-pass">Password</label>
+          <input type="password" id="reg-pass" name="password" required minlength="6" autocomplete="new-password">
+          <button type="submit" class="btn btn-primary" style="width:100%">Create account</button>
+        </form>
+        <p class="auth-switch">
+          Already have an account?
+          <button type="button" class="btn-link" data-auth-show="login">Sign in</button>
+        </p>
+      </div>
+    </div>
+    {% else %}
+
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab-btn active" data-panel="encrypt">Encrypt</button>
+      <button type="button" class="tab-btn" data-panel="decrypt">Decrypt</button>
+      <button type="button" class="tab-btn" data-panel="hash">Hash</button>
+      <button type="button" class="tab-btn" data-panel="stego">Steganography</button>
+      <button type="button" class="tab-btn" data-panel="integrity">Integrity</button>
+      <button type="button" class="tab-btn" data-panel="password">Password gen</button>
+    </nav>
+
+    <section id="encrypt" class="panel card active">
+      <h2>Encrypt file (AES-256)</h2>
+      <p class="hint">Upload a file and set a password. Output is saved as .enc</p>
+      <form method="post" action="{{ url_for('encrypt') }}" enctype="multipart/form-data">
+        <label>File</label>
+        <input type="file" name="file" required>
+        <label>Password</label>
+        <input type="password" name="password" required>
+        <button type="submit" class="btn btn-primary">Encrypt</button>
+      </form>
+    </section>
+
+    <section id="decrypt" class="panel card">
+      <h2>Decrypt file</h2>
+      <p class="hint">Upload an .enc file and enter the same password used to encrypt.</p>
+      <form method="post" action="{{ url_for('decrypt_route') }}" enctype="multipart/form-data">
+        <label>Encrypted file</label>
+        <input type="file" name="file" required>
+        <label>Password</label>
+        <input type="password" name="password" required>
+        <button type="submit" class="btn btn-primary">Decrypt</button>
+      </form>
+    </section>
+
+    <section id="hash" class="panel card">
+      <h2>Generate hash</h2>
+      <p class="hint">Enter text or upload a file (text takes priority if both provided).</p>
+      <form method="post" action="{{ url_for('hash_route') }}" enctype="multipart/form-data">
+        <label>Algorithm</label>
+        <select name="algorithm">
+          <option value="sha256">SHA-256</option>
+          <option value="md5">MD5</option>
+        </select>
+        <label>Text (optional)</label>
+        <textarea name="text" placeholder="Type text to hash…"></textarea>
+        <label>Or file (optional)</label>
+        <input type="file" name="file">
+        <button type="submit" class="btn btn-primary">Generate hash</button>
+      </form>
+    </section>
+
+    <section id="stego" class="panel card">
+      <h2>Steganography</h2>
+      <div class="split">
+        <div>
+          <h3 style="margin-top:0;font-size:1rem;">Hide message</h3>
+          <form method="post" action="{{ url_for('stego_hide') }}" enctype="multipart/form-data">
+            <label>Image (PNG/JPG)</label>
+            <input type="file" name="image" accept="image/*" required>
+            <label>Secret message</label>
+            <textarea name="message" required placeholder="Message to hide…"></textarea>
+            <button type="submit" class="btn btn-primary">Hide message</button>
+          </form>
+        </div>
+        <div>
+          <h3 style="margin-top:0;font-size:1rem;">Extract message</h3>
+          <form method="post" action="{{ url_for('stego_extract') }}" enctype="multipart/form-data">
+            <label>Image with hidden data</label>
+            <input type="file" name="image" accept="image/*" required>
+            <button type="submit" class="btn btn-primary">Extract message</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="integrity" class="panel card">
+      <h2>File integrity</h2>
+      <p class="hint">Use the same filename when saving baseline and when verifying.</p>
+      <div class="split">
+        <form method="post" action="{{ url_for('integrity_baseline') }}" enctype="multipart/form-data">
+          <h3 style="margin-top:0;font-size:1rem;">Save baseline</h3>
+          <input type="file" name="file" required>
+          <button type="submit" class="btn btn-primary">Save baseline</button>
+        </form>
+        <form method="post" action="{{ url_for('integrity_verify') }}" enctype="multipart/form-data">
+          <h3 style="margin-top:0;font-size:1rem;">Verify integrity</h3>
+          <input type="file" name="file" required>
+          <button type="submit" class="btn btn-primary">Verify</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="password" class="panel card">
+      <h2>Secure password generator</h2>
+      <form method="post" action="{{ url_for('generate_password') }}">
+        <label>Length</label>
+        <input type="number" name="length" value="16" min="8" max="128">
+        <div class="check-row">
+          <label><input type="checkbox" name="upper" checked> Uppercase</label>
+          <label><input type="checkbox" name="lower" checked> Lowercase</label>
+          <label><input type="checkbox" name="digits" checked> Digits</label>
+          <label><input type="checkbox" name="symbols"> Symbols</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Generate</button>
+      </form>
+    </section>
+
+    {% endif %}
+  </main>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const toggle = document.getElementById("theme-toggle");
+      const icon = document.getElementById("theme-icon");
+      const label = document.getElementById("theme-label");
+
+      function applyTheme(theme) {
+        root.setAttribute("data-theme", theme);
+        localStorage.setItem("theme", theme);
+        const isDark = theme === "dark";
+        icon.textContent = isDark ? "🌙" : "☀️";
+        label.textContent = isDark ? "Dark" : "Light";
+      }
+
+      toggle.addEventListener("click", function () {
+        const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        applyTheme(next);
+      });
+
+      applyTheme(root.getAttribute("data-theme") || "dark");
+
+      function showAuthPane(name) {
+        document.getElementById("auth-login").classList.toggle("active", name === "login");
+        document.getElementById("auth-register").classList.toggle("active", name === "register");
+      }
+
+      document.querySelectorAll("[data-auth-show]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          showAuthPane(btn.getAttribute("data-auth-show"));
+        });
+      });
+
+      const buttons = document.querySelectorAll(".tab-btn");
+      const panels = document.querySelectorAll(".panel");
+
+      function showPanel(id) {
+        buttons.forEach(function (b) {
+          b.classList.toggle("active", b.dataset.panel === id);
+        });
+        panels.forEach(function (p) {
+          p.classList.toggle("active", p.id === id);
+        });
+      }
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          showPanel(btn.dataset.panel);
+        });
+      });
+
+      const hash = location.hash.replace("#", "");
+      if (hash && document.getElementById(hash)) {
+        showPanel(hash);
+      }
+    })();
+  </script>
+</body>
+</html>
