@@ -1,3 +1,5 @@
 pycryptodome
 opencv-python
 pillow
+flask
+gunicorn
