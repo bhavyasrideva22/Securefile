@@ -1,0 +1,3 @@
+pycryptodome
+opencv-python
+pillow
